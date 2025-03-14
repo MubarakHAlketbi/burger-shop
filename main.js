@@ -9,40 +9,53 @@ const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.getElementById('game-container').appendChild(renderer.domElement);
 
-// Add orbit controls for camera movement
+// Orbit controls
 const controls = new OrbitControls(camera, renderer.domElement);
 camera.position.set(0, 5, 10);
+controls.target.set(0, 0, 0);
 controls.update();
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
 directionalLight.position.set(5, 10, 5);
 scene.add(directionalLight);
+const pointLight = new THREE.PointLight(0xffffff, 1, 100);
+pointLight.position.set(0, 5, 0);
+scene.add(pointLight);
+
+// Texture loader
+const textureLoader = new THREE.TextureLoader();
+const textures = {};
+const ingredientTypes = ['bottomBun', 'patty', 'cheese', 'lettuce', 'tomato', 'topBun'];
+ingredientTypes.forEach(type => {
+    textures[type] = textureLoader.load(`textures/${type}.png`);
+});
+const counterTexture = textureLoader.load('textures/wood.png');
+const serveTexture = textureLoader.load('textures/serve.png');
 
 // Counter
 const counterGeometry = new THREE.BoxGeometry(10, 1, 10);
-const counterMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 });
+const counterMaterial = new THREE.MeshStandardMaterial({ map: counterTexture });
 const counter = new THREE.Mesh(counterGeometry, counterMaterial);
 counter.position.y = 0.5;
 scene.add(counter);
 
 // Ingredient definitions
 const ingredients = {
-    'bottomBun': { geometry: new THREE.SphereGeometry(1, 32, 16), material: new THREE.MeshBasicMaterial({ color: 0x8B4513 }), height: 1 },
-    'patty': { geometry: new THREE.CylinderGeometry(1, 1, 0.2, 32), material: new THREE.MeshBasicMaterial({ color: 0x654321 }), height: 0.2 },
-    'cheese': { geometry: new THREE.BoxGeometry(1.5, 0.1, 1.5), material: new THREE.MeshBasicMaterial({ color: 0xFFD700 }), height: 0.1 },
-    'lettuce': { geometry: new THREE.PlaneGeometry(1.5, 1.5), material: new THREE.MeshBasicMaterial({ color: 0x00FF00, side: THREE.DoubleSide }), height: 0.1 },
-    'tomato': { geometry: new THREE.CylinderGeometry(1, 1, 0.1, 32), material: new THREE.MeshBasicMaterial({ color: 0xFF0000 }), height: 0.1 },
-    'topBun': { geometry: new THREE.SphereGeometry(1, 32, 16), material: new THREE.MeshBasicMaterial({ color: 0x8B4513 }), height: 1 }
+    'bottomBun': { geometry: new THREE.SphereGeometry(1, 32, 16), height: 1 },
+    'patty': { geometry: new THREE.CylinderGeometry(1, 1, 0.2, 32), height: 0.2 },
+    'cheese': { geometry: new THREE.BoxGeometry(1.5, 0.1, 1.5), height: 0.1 },
+    'lettuce': { geometry: new THREE.PlaneGeometry(1.5, 1.5), height: 0.1 },
+    'tomato': { geometry: new THREE.CylinderGeometry(1, 1, 0.1, 32), height: 0.1 },
+    'topBun': { geometry: new THREE.SphereGeometry(1, 32, 16), height: 1 }
 };
 
 // Selectable ingredients
 const selectableIngredients = [];
-const ingredientTypes = Object.keys(ingredients);
 ingredientTypes.forEach((type, index) => {
-    const ingredient = new THREE.Mesh(ingredients[type].geometry, ingredients[type].material);
+    const ingredient = new THREE.Mesh(ingredients[type].geometry, new THREE.MeshStandardMaterial({ map: textures[type] }));
     ingredient.position.set(-5 + index * 2, 1.5, -5);
     ingredient.userData.type = type;
     scene.add(ingredient);
@@ -51,29 +64,53 @@ ingredientTypes.forEach((type, index) => {
 
 // Player's burger stack
 let stack = [];
-let stackHeight = 1; // Start above counter
+let stackHeight = 1;
 const stackGroup = new THREE.Group();
 stackGroup.position.set(0, 0, 0);
 scene.add(stackGroup);
 
-// Target stack (customer's order)
+// Target stack
 let targetStack = [];
 const targetGroup = new THREE.Group();
 targetGroup.position.set(5, 1, -5);
 scene.add(targetGroup);
 
 // Serve button
-const serveGeometry = new THREE.BoxGeometry(1, 0.5, 1);
-const serveMaterial = new THREE.MeshBasicMaterial({ color: 0x00FF00 });
+const serveGeometry = new THREE.PlaneGeometry(1, 0.5);
+const serveMaterial = new THREE.MeshBasicMaterial({ map: serveTexture, side: THREE.DoubleSide });
 const serveButton = new THREE.Mesh(serveGeometry, serveMaterial);
-serveButton.position.set(0, 1.25, 4);
+serveButton.position.set(0, 1.01, 4);
+serveButton.rotation.x = -Math.PI / 2;
 serveButton.userData.isServeButton = true;
 scene.add(serveButton);
 
+// Labels
+function createTextTexture(text) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'white';
+    ctx.font = '48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 128, 32);
+    return new THREE.CanvasTexture(canvas);
+}
+const customerLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture("Customer's Order") }));
+customerLabel.position.set(5, 3, -5);
+customerLabel.scale.set(2, 0.5, 1);
+scene.add(customerLabel);
+const playerLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: createTextTexture("Your Burger") }));
+playerLabel.position.set(0, 3, 0);
+playerLabel.scale.set(2, 0.5, 1);
+scene.add(playerLabel);
+
 // Game state
 let score = 0;
-let timeLeft = 30; // Seconds per order
+let timeLeft = 30;
 let gameActive = true;
+let streak = 0;
 
 // UI elements
 const scoreElement = document.getElementById('score');
@@ -83,11 +120,9 @@ function updateUI() {
     timerElement.textContent = `Time Left: ${timeLeft.toFixed(1)}s`;
 }
 
-// Raycaster for interaction
+// Raycaster
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-
-// Click handler
 window.addEventListener('click', (event) => {
     if (!gameActive) return;
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
@@ -106,15 +141,14 @@ window.addEventListener('click', (event) => {
     }
 });
 
-// Add ingredient to stack
+// Functions
 function addIngredient(type) {
     const ingredientData = ingredients[type];
-    const ingredient = new THREE.Mesh(ingredientData.geometry, ingredientData.material);
+    const ingredient = new THREE.Mesh(ingredientData.geometry, new THREE.MeshStandardMaterial({ map: textures[type] }));
     ingredient.position.y = stackHeight + ingredientData.height / 2;
     stackGroup.add(ingredient);
     stack.push(type);
     stackHeight += ingredientData.height;
-    // Animation effect
     ingredient.scale.set(0.1, 0.1, 0.1);
     new TWEEN.Tween(ingredient.scale)
         .to({ x: 1, y: 1, z: 1 }, 200)
@@ -122,7 +156,6 @@ function addIngredient(type) {
         .start();
 }
 
-// Remove top ingredient
 function removeTopIngredient() {
     if (stack.length > 0) {
         const topIngredient = stackGroup.children[stackGroup.children.length - 1];
@@ -131,21 +164,19 @@ function removeTopIngredient() {
     }
 }
 
-// Generate random order
 function generateOrder() {
     targetStack = ['bottomBun'];
     const middleIngredients = ['patty', 'cheese', 'lettuce', 'tomato'];
-    const numMiddle = Math.min(Math.floor(score / 10) + 1, 4); // Increase complexity with score
+    const numMiddle = Math.min(Math.floor(score / 10) + 1, 4);
     for (let i = 0; i < numMiddle; i++) {
         const randomIngredient = middleIngredients[Math.floor(Math.random() * middleIngredients.length)];
         targetStack.push(randomIngredient);
     }
     targetStack.push('topBun');
     buildTargetStack();
-    timeLeft = 30; // Reset timer
+    timeLeft = 30;
 }
 
-// Build target stack
 function buildTargetStack() {
     while (targetGroup.children.length > 0) {
         targetGroup.remove(targetGroup.children[0]);
@@ -153,28 +184,30 @@ function buildTargetStack() {
     let height = 0;
     targetStack.forEach(type => {
         const ingredientData = ingredients[type];
-        const ingredient = new THREE.Mesh(ingredientData.geometry, ingredientData.material);
+        const ingredient = new THREE.Mesh(ingredientData.geometry, new THREE.MeshStandardMaterial({ map: textures[type] }));
         ingredient.position.y = height + ingredientData.height / 2;
         targetGroup.add(ingredient);
         height += ingredientData.height;
     });
 }
 
-// Serve burger and check result
 function serveBurger() {
     if (JSON.stringify(stack) === JSON.stringify(targetStack)) {
-        score += Math.floor(100 + timeLeft * 5); // Base points + time bonus
-        console.log('Burger served correctly! +', Math.floor(100 + timeLeft * 5), 'points');
+        streak++;
+        const multiplier = 1 + Math.min(streak * 0.1, 1);
+        const basePoints = 100 + timeLeft * 5;
+        score += Math.floor(basePoints * multiplier);
+        console.log('Burger served correctly! +', Math.floor(basePoints * multiplier), 'points');
         resetBurger();
         generateOrder();
     } else {
+        streak = 0;
         score -= 50;
         console.log('Wrong burger! -50 points');
         resetBurger();
     }
 }
 
-// Reset burger stack
 function resetBurger() {
     stack = [];
     stackHeight = 1;
@@ -183,15 +216,23 @@ function resetBurger() {
     }
 }
 
-// Fun mechanic: Customer changes order
 function maybeChangeOrder() {
-    if (Math.random() < 0.1 && stack.length > 0 && timeLeft > 10) { // 10% chance if time remains
+    if (Math.random() < 0.1 && stack.length > 0 && timeLeft > 10) {
         const middleIngredients = ['patty', 'cheese', 'lettuce', 'tomato'];
         const extra = middleIngredients[Math.floor(Math.random() * middleIngredients.length)];
-        targetStack.splice(targetStack.length - 1, 0, extra); // Add before top bun
+        targetStack.splice(targetStack.length - 1, 0, extra);
         buildTargetStack();
+        flashTargetStack();
         console.log('Customer changed their mind! Added', extra);
     }
+}
+
+function flashTargetStack() {
+    new TWEEN.Tween(targetGroup.scale)
+        .to({ x: 1.1, y: 1.1, z: 1.1 }, 100)
+        .yoyo(true)
+        .repeat(1)
+        .start();
 }
 
 // Animation loop
@@ -213,7 +254,7 @@ function animate(time) {
         updateUI();
     }
 
-    TWEEN.update(time); // Pass time to TWEEN.update for consistency
+    TWEEN.update(time);
     controls.update();
     renderer.render(scene, camera);
 }
@@ -222,7 +263,7 @@ function animate(time) {
 generateOrder();
 animate(0);
 
-// Handle window resize
+// Resize handler
 window.addEventListener('resize', () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
